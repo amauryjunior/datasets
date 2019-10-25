@@ -18,19 +18,6 @@ function set_status() {
     STATUS=$(($last_status || $STATUS))
 }
 
-# Certain datasets/tests don't work with TF2
-# Skip them here, and link to a GitHub issue that explains why it doesn't work
-# and what the plan is to support it.
-TF2_IGNORE_TESTS=""
-if [[ "$TF_VERSION" == "2.0.0"  ]]
-then
-  # * lsun_test: https://github.com/tensorflow/datasets/issues/34
-  TF2_IGNORE_TESTS="
-  tensorflow_datasets/image/lsun_test.py
-  "
-fi
-TF2_IGNORE=$(for test in $TF2_IGNORE_TESTS; do echo "--ignore=$test "; done)
-
 # Run Tests
 # Ignores:
 # * Some TF2 tests if running against TF2 (see above)
@@ -43,8 +30,8 @@ TF2_IGNORE=$(for test in $TF2_IGNORE_TESTS; do echo "--ignore=$test "; done)
 pytest \
   -n auto \
   --disable-warnings \
-  $TF2_IGNORE \
   --ignore="tensorflow_datasets/audio/nsynth_test.py" \
+  --ignore="tensorflow_datasets/image/lsun_test.py" \
   --ignore="tensorflow_datasets/testing/test_utils.py" \
   --ignore="tensorflow_datasets/scripts/build_docs_test.py" \
   --ignore="tensorflow_datasets/eager_not_enabled_by_default_test.py"
@@ -90,20 +77,32 @@ fi
 
 
 # Run NSynth, in a contained enviornement
-function test_nsynth() {
+function test_isolation_nsynth() {
   create_virtualenv tfds_nsynth $PY_BIN
   ./oss_scripts/oss_pip_install.sh
-  pip install -e .[tests_nsynth]
+  pip install -e .[nsynth]
   pytest \
     --disable-warnings \
-    "tensorflow_datasets/audio/nsynth_test.py"
+    "tensorflow_datasets/audio/nsynth_test.py" \
+  set_status
+}
+
+# Run LSun, in a contained enviornement
+function test_isolation_lsun() {
+  create_virtualenv tfds_lsun $PY_BIN
+  ./oss_scripts/oss_pip_install.sh
+  pip install -e .[lsun]
+  pytest \
+    --disable-warnings \
+    "tensorflow_datasets/image/lsun_test.py"
   set_status
 }
 
 if [[ "$PY_BIN" != "python2.7" && "$TF_VERSION" == "2.0.0" ]]
 then
-  echo "Testing NSynth"
-  test_nsynth
+  echo "============= Testing Isolation ============="
+  test_isolation_nsynth
+  test_isolation_lsun
   set_status
 fi
 
